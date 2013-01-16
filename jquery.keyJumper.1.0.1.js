@@ -1,11 +1,16 @@
 /**
  * jquery.keyJumper
  *
- * Version:     1.0.0
- * Last Update: 2012/12/23
+ * Version:     1.0.1
+ * Last Update: 2013/01/16
  * Manuel Bitto (manuel.bitto@gmail.com)
  *
  * This plugin is intended to help keyboard navigation through html nodes.
+ *
+ * changes log:
+ *
+ * version 1.0.1 -> Skip visibility:hidden elements
+
  *
  */
 
@@ -29,7 +34,9 @@
         }, options);
 
         if(currentElement === null){
-            currentElement = $('.' + _options.onClass).not(":hidden").first()[0];
+            currentElement = $('.' + _options.onClass).filter(function(){
+                return $(this).not(":hidden") && $(this).css("visibility") === "visible";
+            }).first()[0];
             if(typeof currentElement === "undefined"){
                 currentElement = $('.' + _options.navigableClass).first();
                 currentElement.addClass(_options.onClass);
@@ -56,7 +63,7 @@
         var $element = $(element);
 
         // If element is hidden
-        if($element.is(':hidden')){
+        if($element.is(':hidden') || $element.css("visibility") === "hidden"){
             return false;
         }
 
@@ -259,15 +266,13 @@
         $oldElement.removeClass(_options.onClass).addClass(_options.offClass);
         $currentElement.removeClass(_options.offClass).addClass(_options.onClass);
 
-        console.log($currentElement, !silently);
-
         if(!silently){
             if(onAfterChange !== null){
                 $oldElement.trigger('blur');
                 $currentElement.trigger('focus');
                 $currentElement.trigger('changeSelected');
                 for(var i = 0; i < onAfterChange.length; i++){
-                    onAfterChange[i]($currentElement);
+                    onAfterChange[i]($currentElement, $oldElement);
                 }
             }
         }
