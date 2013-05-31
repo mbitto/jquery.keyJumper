@@ -1,8 +1,8 @@
 /**
  * jquery.keyJumper
  *
- * Version:     1.0.2
- * Last Update: 2013/04/11
+ * Version:     1.1.0
+ * Last Update: 2013/05/31
  * Manuel Bitto (manuel.bitto@gmail.com)
  *
  * This plugin is intended to help keyboard navigation through html nodes.
