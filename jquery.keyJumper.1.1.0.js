@@ -1,20 +1,21 @@
 /**
  * jquery.keyJumper
  *
- * Version:     1.0.1
- * Last Update: 2013/01/16
+ * Version:     1.0.2
+ * Last Update: 2013/04/11
  * Manuel Bitto (manuel.bitto@gmail.com)
  *
  * This plugin is intended to help keyboard navigation through html nodes.
  *
- * changes log:
+ * changelog:
  *
  * version 1.0.1 -> Skip visibility:hidden elements
-
+ * version 1.0.2 -> Removed scanned area
+ * version 1.1.0 -> Changed helper logic to be more intuitive
  *
  */
 
- (function($) {
+(function($) {
 
     var _options,
         knownElements = [],
@@ -28,12 +29,13 @@
         _options = $.extend({
             navigableClass : '',
             onClass : '',
-            offClass : '',
-            areaToScanX : 1500,
-            areaToScanY : 1500
+            offClass : ''
         }, options);
 
         if(currentElement === null){
+            if(_options.onClass === ''){
+                console.error('keyNavigator has no class name defined for active (on) element');
+            }
             currentElement = $('.' + _options.onClass).filter(function(){
                 return $(this).not(":hidden") && $(this).css("visibility") === "visible";
             }).first()[0];
@@ -67,27 +69,13 @@
             return false;
         }
 
-        var elementPosition = getPosition(element),
-            currentElementPosition = getPosition(currentElement),
-            elementsYDistance = Math.abs(elementPosition.y - currentElementPosition.y),
-            elementsXDistance = Math.abs(elementPosition.x - currentElementPosition.x);
-
-        // Fix a strange behaviour of chrome (doesn't always recognize children of hidden elements as hidden)
-        if(currentElementPosition.w === 0){
-            return false;
-        }
-
-        // If element is out of scan area do nothing
-        if(elementsXDistance > _options.areaToScanX || elementsYDistance > _options.areaToScanY){
-            return false
-        }
-
         $element.data('position', getPosition(element));
         $element.data('onClass', _options.onClass);
         $element.data('offClass', _options.offClass);
         $element.mouseover(function(){
             setActive(this);
         });
+
         knownElements.push(element);
     };
 
@@ -129,20 +117,37 @@
         var closeElements = [];
         var currentElementPosition = $currentElement.data("position");
 
-
         // Check within each known element
         for(var i = 0; i < knownElements.length; i++) {
+
             var $knownElement = $(knownElements[i]);
             var knownElementPosition = $knownElement.data("position");
 
             // Check if known element is close to current element
-            var isCloseElement = isClose(currentElementPosition, knownElementPosition, $currentElement, $knownElement);
+            var isCloseElement = isClose(currentElementPosition, knownElementPosition);
 
             if(isCloseElement && currentElement != knownElements[i]) {
                 closeElements.push(knownElements[i]);
             }
         }
+
         return closeElements;
+    };
+
+    var findHelper = function(){
+
+        if(typeof $(currentElement).data("keynav-helper") === "undefined"){
+            return { up: null, right: null, down: null, left: null };
+        }
+
+        // Parse helper content
+        var helperContentArray = $(currentElement).data("keynav-helper").split(" ");
+        return{
+            up: helperContentArray[0],
+            right: helperContentArray[1],
+            down: helperContentArray[2],
+            left: helperContentArray[3]
+        }
     };
 
     // Activate closest element (if exist)
@@ -151,36 +156,23 @@
         var closestElement,
             closestDistance,
             distance,
+            closeElementsPosition,
+            i,
             currentElementPosition = $currentElement.data("position");
 
         // Find closest element within the close elements
-        closestFound:   //How cool is this?
-            for(var i = 0; i < closeElements.length; i++) {
-                var $closeElement = $(closeElements[i]);
+        for(i = 0; i < closeElements.length; i++) {
+            closeElementsPosition = $(closeElements[i]).data("position");
 
-                // If we found an helper we try to use it
-                if(elementHasHelper($closeElement)){
-                    var helperContent = getHelperContent($closeElement);
-                    // Helper content match current element and direction
-                    for(var j=0; j<helperContent[direction].length; j++){
-                        if(helperContent[direction][j] !== "null" && $currentElement.hasClass(helperContent[direction][j])){
-                            closestElement = closeElements[i];
-                            break closestFound;
-                        }
-                    }
-                }
+            // Find distance between 2 elements
+            distance = getDistance(currentElementPosition, closeElementsPosition);
 
-                var closeElementsPosition = $(closeElements[i]).data("position");
-
-                // Find distance between 2 elements
-                distance = getDistance(currentElementPosition, closeElementsPosition);
-
-                // Check if is the closest found yet
-                if(typeof closestDistance === "undefined" || distance < closestDistance) {
-                    closestDistance = distance;
-                    closestElement = closeElements[i];
-                }
+            // Check if is the closest found yet
+            if(typeof closestDistance === "undefined" || distance < closestDistance) {
+                closestDistance = distance;
+                closestElement = closeElements[i];
             }
+        }
 
         // If closest element is found activate it
         if(typeof closestElement !== "undefined"){
@@ -188,63 +180,74 @@
         }
     };
 
-    var elementHasHelper = function(element){
-        return typeof element.data("keynav-helper") !== "undefined";
-    };
-
-    var getHelperContent = function(element){
-        // Parse helper content
-        var helperContentArray = element.data("keynav-helper").split(" ");
-        // Order is intentionally reverted if compared to CSS style directions, because we want to get the direction
-        // of the current element from the receiver element point of view
-        return{
-            down : helperContentArray[0].split("_"),
-            left: helperContentArray[1].split("_"),
-            up: helperContentArray[2].split("_"),
-            right: helperContentArray[3].split("_")
-        }
-    };
-
     // Manage keyboard events
     var eventsManager = function(event){
         if(canMove){
+            var closeElements,
+                helper;
 
-            var closeElements;
+            console.time('event');
+
             switch(event.keyCode){
                 case 37:    // Left
-                    closeElements = findCloseElements(function(current, other){
-                        return current.olx >= other.orx;
-                    });
-                    activateClosest(closeElements, 'left', function(current, other){
-                        return Math.sqrt(Math.pow(current.olx - other.orx, 2) + Math.pow(current.oly - other.ory, 2));
-                    });
+                    helper = findHelper().left;
+                    if(helper && typeof $(helper)[0] !== "undefined"){
+                        setActive($(helper));
+                    }
+                    else{
+                        closeElements = findCloseElements(function(current, other){
+                            return current.olx >= other.orx;
+                        });
+                        activateClosest(closeElements, 'left', function(current, other){
+                            return Math.sqrt(Math.pow(current.olx - other.orx, 2) + Math.pow(current.oly - other.ory, 2));
+                        });
+                    }
                     break;
                 case 38:    // Up
-                    closeElements = findCloseElements(function(current, other){
-                        return current.oty >= other.oby;
-                    });
-                    activateClosest(closeElements, 'up', function(current, other){
-                        return Math.sqrt(Math.pow(current.oty - other.oby, 2) + Math.pow(current.otx - other.obx, 2));
-                    });
+                    helper = findHelper().up;
+                    if(helper && typeof $(helper)[0] !== "undefined"){
+                        setActive($(helper));
+                    }
+                    else{
+                        closeElements = findCloseElements(function(current, other){
+                            return current.oty >= other.oby;
+                        });
+                        activateClosest(closeElements, 'up', function(current, other){
+                            return Math.sqrt(Math.pow(current.oty - other.oby, 2) + Math.pow(current.otx - other.obx, 2));
+                        });
+                    }
                     break;
                 case 39:    // Right
-                    closeElements = findCloseElements(function(current, other){
-                        return current.orx <= other.olx;
-                    });
-                    activateClosest(closeElements, 'right', function(current, other){
-                        return Math.sqrt(Math.pow(current.orx - other.olx, 2) + Math.pow(current.ory - other.oly, 2));
-                    });
+                    helper = findHelper().right;
+                    if(helper && typeof $(helper)[0] !== "undefined"){
+                        setActive($(helper));
+                    }
+                    else{
+                        closeElements = findCloseElements(function(current, other){
+                            return current.orx <= other.olx;
+                        });
+                        activateClosest(closeElements, 'right', function(current, other){
+                            return Math.sqrt(Math.pow(current.orx - other.olx, 2) + Math.pow(current.ory - other.oly, 2));
+                        });
+                    }
                     break;
                 case 40:    // Down
-                    closeElements = findCloseElements(function(current, other){
-                        return current.oby <= other.oty;
-                    });
-                    activateClosest(closeElements, 'down', function(current, other){
-                        return Math.sqrt(Math.pow(current.obx - other.otx, 2) + Math.pow(current.oby - other.oty, 2));
-                    });
+                    helper = findHelper().down;
+                    if(helper && typeof $(helper)[0] !== "undefined"){
+                        setActive($(helper));
+                    }
+                    else{
+                        closeElements = findCloseElements(function(current, other){
+                            return current.oby <= other.oty;
+                        });
+                        activateClosest(closeElements, 'down', function(current, other){
+                            return Math.sqrt(Math.pow(current.obx - other.otx, 2) + Math.pow(current.oby - other.oty, 2));
+                        });
+                    }
                     break;
                 case 13:    // Enter
                     $currentElement.trigger('keynav.enter');
+                    console.timeEnd('event');
                     break;
                 default: // nothing to do
             }
@@ -276,6 +279,7 @@
                 }
             }
         }
+        console.timeEnd('event');
     };
 
     var publicMethods = {
@@ -304,7 +308,7 @@
             canMove = !state;
         },
 
-        // Refresh keyNavigator
+        // Refresh keyJumper
         refresh : function(){
             knownElements = [];
             currentElement = null;
@@ -317,26 +321,26 @@
             $currentElement = null;
             canMove = true;
             onAfterChange = [];
-            $(document).off('keyup.keyNavigator');
+            $(document).off('keyup.keyJumper');
         }
     };
 
-    // Plug keyNavigator in
-    $.fn.keyNavigator = function(method){
+    // Plug keyJumper in
+    $.fn.keyJumper = function(method){
 
-        // We have a method like $('page').keyNavigator("setActive");
+        // We have a method like $('page').keyJumper("setActive");
         if ( publicMethods[method] ) {
             return publicMethods[method].apply( this, Array.prototype.slice.call( arguments, 1 ));
         }
-        // We have a initialization of keyNavigator
+        // We have a initialization of keyJumper
         else if ( typeof method === 'object' || ! method ) {
-            $(document).on('keyup.keyNavigator', eventsManager);
+            $(document).on('keyup.keyJumper', eventsManager);
 
             return init.apply( this, arguments );
         }
         // We've done something wrong here
         else {
-            $.error( 'Method ' +  method + ' does not exist on jQuery.keyNavigator' );
+            $.error( 'Method ' +  method + ' does not exist on jQuery.keyJumper' );
         }
     };
 })(jQuery);
