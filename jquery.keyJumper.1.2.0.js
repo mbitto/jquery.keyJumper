@@ -1,8 +1,8 @@
 /**
  * jquery.keyJumper
  *
- * Version:     1.1.1
- * Last Update: 2013/06/20
+ * Version:     1.2.0
+ * Last Update: 2013/06/26
  * Manuel Bitto (manuel.bitto@gmail.com)
  *
  * This plugin is intended to help keyboard navigation through html nodes.
@@ -13,6 +13,7 @@
  * version 1.0.2 -> Removed scanned area
  * version 1.1.0 -> Changed helper logic to be more intuitive
  * version 1.1.1 -> Fixed rendering bug on setCurrent
+ * version 1.2.0 -> Refresh will take in account modifies to elements
  *
  */
 
@@ -187,8 +188,6 @@
             var closeElements,
                 helper;
 
-            console.time('event');
-
             switch(event.keyCode){
                 case 37:    // Left
                     helper = findHelper().left;
@@ -248,7 +247,6 @@
                     break;
                 case 13:    // Enter
                     $currentElement.trigger('keynav.enter');
-                    console.timeEnd('event');
                     break;
                 default: // nothing to do
             }
@@ -280,7 +278,6 @@
                 }
             }
         }
-        console.timeEnd('event');
     };
 
     var publicMethods = {
@@ -315,7 +312,8 @@
         refresh : function(){
             knownElements = [];
             currentElement = null;
-            init.call(this, _options);
+            var currentElements = $('.' + _options.navigableClass);
+            init.call(currentElements, _options);
         },
 
         destroy : function(){
