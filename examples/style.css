@@ -1,6 +1,6 @@
 .container{position: relative}
-.selectable{border: 3px #fff solid; height: 50px; width: 50px; position: absolute; font-size: 28px; text-align: center;}
-.selected {border: 3px red solid;}
+.selectable{border: 5px #fff solid; height: 50px; width: 50px; position: absolute; font-size: 28px; text-align: center;}
+.selected {border: 5px red solid;}
 
 .example1{}
 .example2{margin-top: 190px;}

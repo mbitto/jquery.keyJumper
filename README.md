@@ -1,6 +1,8 @@
-jquery.i18Now
+jquery.keyJumper
 =============
 
-This plugin is intended to help keyboard navigation through html nodes.
+A jQuery plugin to allow keyboard navigation through html nodes using arrow keys.
 
-Check out examples/ content for demo.
+![title](./keyJumper.png)
+
+Check out /examples for demo.
